@@ -8,6 +8,7 @@ import streamlit as st
 
 from dreamapply import COLUMNS, scrape
 from excel_export import from_excel_bytes, to_excel_bytes, upsert
+from search import search_dreamapply_courses
 
 st.set_page_config(page_title="Lithuania Course Tracker", page_icon="🎓", layout="wide")
 
@@ -42,6 +43,15 @@ st.markdown(
 
 if "rows" not in st.session_state:
     st.session_state.rows = []
+if "search_results" not in st.session_state:
+    st.session_state.search_results = []
+
+
+def _serper_api_key() -> str:
+    try:
+        return st.secrets.get("SERPER_API_KEY", "")
+    except Exception:
+        return ""
 
 st.title("🎓 Lithuania Course Tracker")
 st.write(
@@ -54,6 +64,45 @@ with st.expander("Continue an Excel file you downloaded before"):
     if uploaded is not None and st.button("Load this file"):
         st.session_state.rows = from_excel_bytes(uploaded.getvalue())
         st.success(f"Loaded {len(st.session_state.rows)} courses.")
+
+with st.expander("Find courses by country (uses web search)"):
+    api_key = _serper_api_key()
+    if not api_key:
+        st.info(
+            "This needs a free Serper.dev API key. Add it as a secret named "
+            "`SERPER_API_KEY` in Streamlit Cloud (app settings -> Secrets), or in a "
+            "local `.streamlit/secrets.toml` file, then reload the app."
+        )
+    else:
+        country = st.text_input("Country", placeholder="Lithuania")
+        if st.button("Search") and country.strip():
+            st.session_state.search_ran = True
+            with st.spinner(f"Searching for {country.strip()} bachelor courses..."):
+                try:
+                    st.session_state.search_results = search_dreamapply_courses(country.strip(), api_key)
+                except Exception as error:
+                    st.error(f"Search failed: {error}")
+                    st.session_state.search_results = []
+
+        results = st.session_state.search_results
+        if results:
+            st.caption(f"Found {len(results)} course page(s). Pick the ones to add:")
+            selected_urls = [
+                result["link"]
+                for i, result in enumerate(results)
+                if st.checkbox(result["title"], key=f"search_pick_{i}")
+            ]
+            if st.button("Add selected courses", type="primary") and selected_urls:
+                for url in selected_urls:
+                    try:
+                        with st.spinner(f"Reading {url}"):
+                            row = scrape(url)
+                        st.session_state.rows = upsert(st.session_state.rows, row)
+                        st.success(f"Added: {row['Programme']} - {row['University']}")
+                    except Exception as error:
+                        st.error(f"Couldn't read {url}: {error}")
+        elif "search_ran" in st.session_state:
+            st.caption("No DreamApply course pages found for that country. Try a different spelling.")
 
 urls_text = st.text_area(
     "Course links",
