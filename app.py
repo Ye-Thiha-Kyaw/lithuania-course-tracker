@@ -11,6 +11,35 @@ from excel_export import from_excel_bytes, to_excel_bytes, upsert
 
 st.set_page_config(page_title="Lithuania Course Tracker", page_icon="🎓", layout="wide")
 
+st.markdown(
+    """
+    <style>
+    [data-testid="stDataFrame"] ::-webkit-scrollbar {
+        height: 16px;
+        width: 16px;
+    }
+    [data-testid="stDataFrame"] ::-webkit-scrollbar-track {
+        background: rgba(128, 128, 128, 0.15);
+    }
+    [data-testid="stDataFrame"] ::-webkit-scrollbar-thumb {
+        background: rgba(128, 128, 128, 0.8);
+        border-radius: 8px;
+        border: 3px solid transparent;
+        background-clip: padding-box;
+    }
+    [data-testid="stDataFrame"] ::-webkit-scrollbar-thumb:hover {
+        background: rgba(128, 128, 128, 1);
+        background-clip: padding-box;
+    }
+    [data-testid="stDataFrame"] * {
+        scrollbar-width: auto;
+        scrollbar-color: rgba(128, 128, 128, 0.8) rgba(128, 128, 128, 0.15);
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
 if "rows" not in st.session_state:
     st.session_state.rows = []
 
