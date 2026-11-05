@@ -22,7 +22,8 @@ def search_dreamapply_courses(country: str, api_key: str, num_results: int = 20)
         json={"q": query, "num": num_results},
         timeout=20,
     )
-    response.raise_for_status()
+    if not response.ok:
+        raise RuntimeError(f"Serper API error {response.status_code}: {response.text.strip()}")
     data = response.json()
 
     seen: set[str] = set()
