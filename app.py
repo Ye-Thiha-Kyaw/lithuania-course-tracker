@@ -46,6 +46,10 @@ if "rows" not in st.session_state:
     st.session_state.rows = []
 if "search_results" not in st.session_state:
     st.session_state.search_results = []
+if "add_queue" not in st.session_state:
+    st.session_state.add_queue = []
+if "add_queue_total" not in st.session_state:
+    st.session_state.add_queue_total = 0
 
 
 def _secret(name: str) -> str:
@@ -117,24 +121,44 @@ with st.expander("Find courses by country (uses web search)"):
                 if st.checkbox(label, key=f"search_pick_{i}"):
                     selected.append(result)
             if st.button("Add selected courses", type="primary") and selected:
-                for result in selected:
-                    url = result["link"]
-                    try:
-                        if result["is_dreamapply"]:
-                            with st.spinner(f"Reading {url}"):
-                                row = scrape(url)
-                        elif extract_fn:
-                            with st.spinner(f"Reading {url} with {ai_provider}..."):
-                                row = extract_fn(url, ai_key)
-                        else:
-                            st.warning(f"Skipped {url}: add an AI API key to read non-DreamApply pages.")
-                            continue
-                        st.session_state.rows = upsert(st.session_state.rows, row)
-                        st.success(f"Added: {row['Programme']} - {row['University']}")
-                    except Exception as error:
-                        st.error(f"Couldn't read {url}: {error}")
+                st.session_state.add_queue = list(selected)
+                st.session_state.add_queue_total = len(selected)
+                st.rerun()
         elif "search_ran" in st.session_state:
             st.caption("No course pages found for that country. Try a different spelling.")
+
+        if st.session_state.add_queue:
+            done = st.session_state.add_queue_total - len(st.session_state.add_queue)
+            st.progress(
+                done / st.session_state.add_queue_total,
+                text=f"Adding course {done + 1} of {st.session_state.add_queue_total}...",
+            )
+            if st.button("Stop adding courses"):
+                st.session_state.add_queue = []
+                st.session_state.add_queue_total = 0
+                st.rerun()
+            else:
+                # Process one item per rerun, so the Stop button above stays
+                # clickable between items instead of the whole batch running
+                # in one uninterruptible loop.
+                result = st.session_state.add_queue.pop(0)
+                url = result["link"]
+                try:
+                    if result["is_dreamapply"]:
+                        with st.spinner(f"Reading {url}"):
+                            row = scrape(url)
+                    elif extract_fn:
+                        with st.spinner(f"Reading {url} with {ai_provider}..."):
+                            row = extract_fn(url, ai_key)
+                    else:
+                        st.warning(f"Skipped {url}: add an AI API key to read non-DreamApply pages.")
+                        row = None
+                    if row:
+                        st.session_state.rows = upsert(st.session_state.rows, row)
+                        st.success(f"Added: {row['Programme']} - {row['University']}")
+                except Exception as error:
+                    st.error(f"Couldn't read {url}: {error}")
+                st.rerun()
 
 urls_text = st.text_area(
     "Course links",

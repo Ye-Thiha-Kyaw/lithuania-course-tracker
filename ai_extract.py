@@ -6,7 +6,6 @@ can't read it.
 from __future__ import annotations
 
 from datetime import date
-from typing import Optional
 
 import requests
 from bs4 import BeautifulSoup
@@ -19,27 +18,39 @@ GEMINI_MODEL = "gemini-3.8-flash"
 
 PROMPT = (
     "This is the text of a university bachelor's degree course/programme page. "
-    "Extract the fields in the schema from it. Use an empty string, 0, or null for "
-    "anything not stated on the page - never guess or invent a value.\n\n"
+    "Extract the fields in the schema from it. Every field is a plain string - for "
+    "a number, write only the digits (and a decimal point if needed), no currency "
+    "symbols, units or ranges (e.g. '12000' not '€12,000/year', '6.5' not 'IELTS 6.5'). "
+    "Leave a field as an empty string if it isn't stated on the page - never guess or "
+    "invent a value.\n\n"
     "PAGE TEXT:\n{page_text}"
 )
 
 
 class CourseInfo(BaseModel):
+    """All fields are plain strings, even numeric ones.
+
+    Structured-output APIs reject a schema built from `Optional[int/float]`
+    fields as "too complex" once there are more than a few of them (each
+    becomes a nullable anyOf, and those combine combinatorially). Keeping
+    every field a flat string avoids that; numeric strings are parsed back
+    into numbers in `_row_from_info`.
+    """
+
     university: str = ""
     programme: str = ""
     degree: str = ""
     city: str = ""
     duration: str = ""
-    ects: Optional[int] = None
-    tuition_eur_per_year: Optional[float] = None
-    application_fee_eur: Optional[float] = None
-    min_grade_percent: Optional[int] = None
+    ects: str = ""
+    tuition_eur_per_year: str = ""
+    application_fee_eur: str = ""
+    min_grade_percent: str = ""
     admission_formula: str = ""
-    ielts_min: Optional[float] = None
-    duolingo_min: Optional[int] = None
+    ielts_min: str = ""
+    duolingo_min: str = ""
     english_requirement: str = ""
-    references_needed: int = 0
+    references_needed: str = ""
     motivation_letter: str = "No"
     other_documents: str = ""
     blocked_citizenships: str = ""
@@ -59,6 +70,22 @@ def fetch_page_text(url: str, timeout: int = 20, max_chars: int = 15000) -> str:
     return soup.get_text("\n", strip=True)[:max_chars]
 
 
+def _as_int(text: str) -> int | None:
+    text = (text or "").strip()
+    try:
+        return int(float(text)) if text else None
+    except ValueError:
+        return None
+
+
+def _as_float(text: str) -> float | None:
+    text = (text or "").strip()
+    try:
+        return float(text) if text else None
+    except ValueError:
+        return None
+
+
 def _row_from_info(info: CourseInfo, url: str) -> dict:
     return {
         "University": info.university,
@@ -66,15 +93,15 @@ def _row_from_info(info: CourseInfo, url: str) -> dict:
         "Degree": info.degree,
         "City": info.city,
         "Duration": info.duration,
-        "ECTS": info.ects,
-        "Tuition (EUR/year)": info.tuition_eur_per_year,
-        "Application fee (EUR)": info.application_fee_eur,
-        "Min. grade (%)": info.min_grade_percent,
+        "ECTS": _as_int(info.ects),
+        "Tuition (EUR/year)": _as_float(info.tuition_eur_per_year),
+        "Application fee (EUR)": _as_float(info.application_fee_eur),
+        "Min. grade (%)": _as_int(info.min_grade_percent),
         "Admission formula": info.admission_formula,
-        "IELTS (min)": info.ielts_min,
-        "Duolingo (min)": info.duolingo_min,
+        "IELTS (min)": _as_float(info.ielts_min),
+        "Duolingo (min)": _as_int(info.duolingo_min),
         "English requirement": info.english_requirement,
-        "References needed": info.references_needed,
+        "References needed": _as_int(info.references_needed) or 0,
         "Motivation letter": info.motivation_letter,
         "Other documents": info.other_documents,
         "Blocked citizenships": info.blocked_citizenships,
