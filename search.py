@@ -15,7 +15,7 @@ def search_dreamapply_courses(country: str, api_key: str, num_results: int = 20)
     Returns a list of {"title": str, "link": str}, filtered to links that
     `dreamapply.scrape()` can read.
     """
-    query = f'{country} bachelor degree "courses/course" dreamapply'
+    query = f"{country} bachelor degree dreamapply course application"
     response = requests.post(
         SERPER_URL,
         headers={"X-API-KEY": api_key, "Content-Type": "application/json"},
