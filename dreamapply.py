@@ -27,6 +27,7 @@ COLUMNS = [
     "Min. grade (%)",
     "Admission formula",
     "IELTS (min)",
+    "Duolingo (min)",
     "English requirement",
     "References needed",
     "Motivation letter",
@@ -149,6 +150,7 @@ def parse_course(html: str, url: str = "") -> dict:
         formula = f"{formula} (min. score {min_score.group(1)})".strip()
 
     ielts = re.search(r"IELTS\s*([\d](?:[,\.]\d)?)", language_text)
+    duolingo = re.search(r"Duolingo\D{0,10}(\d{2,3})", language_text, re.IGNORECASE)
     references = re.search(r"at least (\d+) reference", other_text, re.IGNORECASE)
 
     blocked = ""
@@ -182,6 +184,7 @@ def parse_course(html: str, url: str = "") -> dict:
         "Min. grade (%)": int(min_grade.group(1)) if min_grade else None,
         "Admission formula": formula,
         "IELTS (min)": float(ielts.group(1).replace(",", ".")) if ielts else None,
+        "Duolingo (min)": int(duolingo.group(1)) if duolingo else None,
         "English requirement": language_text,
         "References needed": int(references.group(1)) if references else 0,
         "Motivation letter": "Yes" if re.search(r"motivation letter", other_text, re.I) else "No",

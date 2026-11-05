@@ -13,7 +13,7 @@ from dreamapply import COLUMNS
 WIDTHS = {
     "University": 28, "Programme": 30, "Degree": 16, "City": 12, "Duration": 14, "ECTS": 8,
     "Tuition (EUR/year)": 12, "Application fee (EUR)": 12, "Min. grade (%)": 10,
-    "Admission formula": 40, "IELTS (min)": 9, "English requirement": 50, "References needed": 11,
+    "Admission formula": 40, "IELTS (min)": 9, "Duolingo (min)": 11, "English requirement": 50, "References needed": 11,
     "Motivation letter": 11, "Other documents": 30, "Blocked citizenships": 30, "Intake": 22,
     "Application deadline": 14, "Studies start": 13, "Entry requirements (full text)": 60,
     "URL": 45, "Date checked": 12,

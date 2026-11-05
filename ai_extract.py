@@ -37,6 +37,7 @@ class CourseInfo(BaseModel):
     min_grade_percent: Optional[int] = None
     admission_formula: str = ""
     ielts_min: Optional[float] = None
+    duolingo_min: Optional[int] = None
     english_requirement: str = ""
     references_needed: int = 0
     motivation_letter: str = "No"
@@ -71,6 +72,7 @@ def _row_from_info(info: CourseInfo, url: str) -> dict:
         "Min. grade (%)": info.min_grade_percent,
         "Admission formula": info.admission_formula,
         "IELTS (min)": info.ielts_min,
+        "Duolingo (min)": info.duolingo_min,
         "English requirement": info.english_requirement,
         "References needed": info.references_needed,
         "Motivation letter": info.motivation_letter,

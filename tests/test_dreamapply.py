@@ -38,6 +38,7 @@ def test_vmu_page():
     assert row["Tuition (EUR/year)"] == 3400
     assert row["Application fee (EUR)"] == 150
     assert row["IELTS (min)"] == 5.5
+    assert row["Duolingo (min)"] == 100
     assert "0.4" in row["Admission formula"] and "min. score 5,4" in row["Admission formula"]
     assert row["Motivation letter"] == "Yes"
     assert row["Blocked citizenships"] == ""
