@@ -6,9 +6,10 @@ Run locally:  streamlit run app.py
 import pandas as pd
 import streamlit as st
 
+from ai_extract import extract_with_anthropic, extract_with_gemini
 from dreamapply import COLUMNS, scrape
 from excel_export import from_excel_bytes, to_excel_bytes, upsert
-from search import search_dreamapply_courses
+from search import search_university_courses
 
 st.set_page_config(page_title="Lithuania Course Tracker", page_icon="🎓", layout="wide")
 
@@ -47,11 +48,23 @@ if "search_results" not in st.session_state:
     st.session_state.search_results = []
 
 
-def _serper_api_key() -> str:
+def _secret(name: str) -> str:
     try:
-        return st.secrets.get("SERPER_API_KEY", "")
+        return st.secrets.get(name, "")
     except Exception:
         return ""
+
+
+def _ai_extractor():
+    """Return (extract_function, api_key, provider_name) for whichever AI
+    secret is configured, preferring Anthropic. None if neither is set."""
+    anthropic_key = _secret("ANTHROPIC_API_KEY")
+    if anthropic_key:
+        return extract_with_anthropic, anthropic_key, "Claude"
+    gemini_key = _secret("GOOGLE_API_KEY")
+    if gemini_key:
+        return extract_with_gemini, gemini_key, "Gemini"
+    return None, "", ""
 
 st.title("🎓 Lithuania Course Tracker")
 st.write(
@@ -66,20 +79,31 @@ with st.expander("Continue an Excel file you downloaded before"):
         st.success(f"Loaded {len(st.session_state.rows)} courses.")
 
 with st.expander("Find courses by country (uses web search)"):
-    api_key = _serper_api_key()
-    if not api_key:
+    serper_key = _secret("SERPER_API_KEY")
+    extract_fn, ai_key, ai_provider = _ai_extractor()
+
+    if not serper_key:
         st.info(
             "This needs a free Serper.dev API key. Add it as a secret named "
             "`SERPER_API_KEY` in Streamlit Cloud (app settings -> Secrets), or in a "
             "local `.streamlit/secrets.toml` file, then reload the app."
         )
     else:
+        if not ai_key:
+            st.caption(
+                "DreamApply course pages will be read automatically. For other "
+                "universities, add an `ANTHROPIC_API_KEY` or `GOOGLE_API_KEY` secret "
+                "to read those pages with AI too - without one they're skipped."
+            )
+        else:
+            st.caption(f"Non-DreamApply pages will be read with {ai_provider}.")
+
         country = st.text_input("Country", placeholder="Lithuania")
         if st.button("Search") and country.strip():
             st.session_state.search_ran = True
             with st.spinner(f"Searching for {country.strip()} bachelor courses..."):
                 try:
-                    st.session_state.search_results = search_dreamapply_courses(country.strip(), api_key)
+                    st.session_state.search_results = search_university_courses(country.strip(), serper_key)
                 except Exception as error:
                     st.error(f"Search failed: {error}")
                     st.session_state.search_results = []
@@ -87,22 +111,30 @@ with st.expander("Find courses by country (uses web search)"):
         results = st.session_state.search_results
         if results:
             st.caption(f"Found {len(results)} course page(s). Pick the ones to add:")
-            selected_urls = [
-                result["link"]
-                for i, result in enumerate(results)
-                if st.checkbox(result["title"], key=f"search_pick_{i}")
-            ]
-            if st.button("Add selected courses", type="primary") and selected_urls:
-                for url in selected_urls:
+            selected = []
+            for i, result in enumerate(results):
+                label = result["title"] if result["is_dreamapply"] else f"{result['title']} (AI read)"
+                if st.checkbox(label, key=f"search_pick_{i}"):
+                    selected.append(result)
+            if st.button("Add selected courses", type="primary") and selected:
+                for result in selected:
+                    url = result["link"]
                     try:
-                        with st.spinner(f"Reading {url}"):
-                            row = scrape(url)
+                        if result["is_dreamapply"]:
+                            with st.spinner(f"Reading {url}"):
+                                row = scrape(url)
+                        elif extract_fn:
+                            with st.spinner(f"Reading {url} with {ai_provider}..."):
+                                row = extract_fn(url, ai_key)
+                        else:
+                            st.warning(f"Skipped {url}: add an AI API key to read non-DreamApply pages.")
+                            continue
                         st.session_state.rows = upsert(st.session_state.rows, row)
                         st.success(f"Added: {row['Programme']} - {row['University']}")
                     except Exception as error:
                         st.error(f"Couldn't read {url}: {error}")
         elif "search_ran" in st.session_state:
-            st.caption("No DreamApply course pages found for that country. Try a different spelling.")
+            st.caption("No course pages found for that country. Try a different spelling.")
 
 urls_text = st.text_area(
     "Course links",

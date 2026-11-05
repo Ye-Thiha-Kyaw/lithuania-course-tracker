@@ -9,7 +9,7 @@ Built as the first step of a larger project: an AI assistant that helps internat
 ## What it does
 
 - Paste one or more DreamApply course links → each becomes a row
-- Or type a country, search the web for matching DreamApply course pages, and pick which ones to add (needs a Serper.dev API key, see below)
+- Or type a country, search the web for bachelor-course pages at *any* university or college there, and pick which ones to add (needs a Serper.dev API key; DreamApply pages are read automatically, other universities' pages are read with an AI model if you add a Claude or Gemini key - see below)
 - Pulls out key numbers: tuition, application fee, minimum grade %, IELTS minimum, references needed, blocked citizenships, deadline, start date
 - Keeps the full requirement text too, because the details matter
 - Edit any cell in the browser, then **Download Excel**
@@ -27,27 +27,40 @@ https://apply.vilniustech.lt/courses/course/209-bachelor-logistics-and-transport
 ```
 app.py               Streamlit web page
 dreamapply.py        Downloads and parses a DreamApply course page
-search.py            Finds DreamApply course pages for a country (Serper.dev search)
+search.py            Finds bachelor-course pages for a country (Serper.dev search)
+ai_extract.py         Reads a non-DreamApply course page with Claude or Gemini
 excel_export.py      Builds the formatted Excel file (and reads it back)
-tests/               Parser, Excel and search tests (pytest)
+tests/               Parser, Excel, search and AI-extraction tests (pytest)
 sample/              Example Excel with two courses
 railway.json         Start command if you deploy on Railway
 ```
 
 ## Country search (optional)
 
-The "Find courses by country" box searches the web for DreamApply course pages instead of
-you pasting links one by one. It needs a free [Serper.dev](https://serper.dev) API key
-(2,500 free searches):
+The "Find courses by country" box searches the web for bachelor-course pages at any
+university or college in that country, instead of you pasting links one by one.
 
-1. Sign up at serper.dev and copy your API key.
-2. **Locally**: create `.streamlit/secrets.toml` with:
-   ```toml
-   SERPER_API_KEY = "your-key-here"
-   ```
-3. **On Streamlit Cloud**: app page -> Settings -> Secrets -> paste the same line.
+1. **Web search** - needs a free [Serper.dev](https://serper.dev) API key (2,500 free
+   searches). Without this key the box just shows setup instructions; everything else
+   in the app still works.
+2. **Reading the pages it finds** - DreamApply pages are parsed automatically, for
+   free, the same way pasted links are. Any other university's page needs an AI model
+   to read it (there's no single layout to parse), so add **one** of:
+   - `ANTHROPIC_API_KEY` (Claude, console.anthropic.com) - used first if both are set
+   - `GOOGLE_API_KEY` (Gemini, aistudio.google.com)
 
-Without a key, the rest of the app (pasting links directly) works exactly as before.
+   Without either key, non-DreamApply results still show up in the list but are
+   skipped when you click "Add selected courses" (a warning says why). AI reads are
+   not free - each page read costs a small amount on your API account.
+
+Add secrets:
+- **Locally**: create `.streamlit/secrets.toml`:
+  ```toml
+  SERPER_API_KEY = "your-serper-key"
+  ANTHROPIC_API_KEY = "your-anthropic-key"      # optional
+  GOOGLE_API_KEY = "your-google-key"            # optional
+  ```
+- **On Streamlit Cloud**: app page -> Settings -> Secrets -> paste the same lines.
 
 ## Run it on your computer
 

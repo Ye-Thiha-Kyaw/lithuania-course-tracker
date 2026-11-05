@@ -1,27 +1,27 @@
 from unittest.mock import MagicMock, patch
 
-from search import search_dreamapply_courses
+from search import search_university_courses
 
 
-def test_search_filters_to_dreamapply_course_links():
+def test_search_tags_dreamapply_links_and_keeps_others():
     fake_response = MagicMock()
-    fake_response.raise_for_status = lambda: None
+    fake_response.ok = True
     fake_response.json.return_value = {
         "organic": [
             {
                 "title": "Logistics and Commerce - VMU",
                 "link": "https://vytautasmagnus.dreamapply.com/courses/course/93-bachelor-degree-logistics-and-commerce",
             },
-            {"title": "University homepage", "link": "https://vytautasmagnus.dreamapply.com/"},
             {
-                "title": "Transport Management - VilniusTech",
-                "link": "https://apply.vilniustech.lt/courses/course/209-bachelor-logistics-and-transport-management",
+                "title": "Trinity College Dublin - Computer Science",
+                "link": "https://www.tcd.ie/courses/undergraduate/computer-science",
             },
+            {"title": "Ireland - Wikipedia", "link": "https://en.wikipedia.org/wiki/Ireland"},
         ]
     }
 
     with patch("search.requests.post", return_value=fake_response) as mock_post:
-        results = search_dreamapply_courses("Lithuania", api_key="fake-key")
+        results = search_university_courses("Ireland", api_key="fake-key")
 
     assert mock_post.called
     _, kwargs = mock_post.call_args
@@ -29,13 +29,17 @@ def test_search_filters_to_dreamapply_course_links():
 
     links = [r["link"] for r in results]
     assert len(results) == 2
-    assert all("/courses/course/" in link for link in links)
-    assert "https://vytautasmagnus.dreamapply.com/" not in links
+    assert "en.wikipedia.org" not in " ".join(links)
+
+    dreamapply_result = next(r for r in results if "dreamapply" in r["link"])
+    other_result = next(r for r in results if "tcd.ie" in r["link"])
+    assert dreamapply_result["is_dreamapply"] is True
+    assert other_result["is_dreamapply"] is False
 
 
 def test_search_deduplicates_links():
     fake_response = MagicMock()
-    fake_response.raise_for_status = lambda: None
+    fake_response.ok = True
     same_link = "https://vytautasmagnus.dreamapply.com/courses/course/93-bachelor-degree-logistics-and-commerce"
     fake_response.json.return_value = {
         "organic": [
@@ -45,6 +49,21 @@ def test_search_deduplicates_links():
     }
 
     with patch("search.requests.post", return_value=fake_response):
-        results = search_dreamapply_courses("Lithuania", api_key="fake-key")
+        results = search_university_courses("Lithuania", api_key="fake-key")
 
     assert len(results) == 1
+
+
+def test_search_raises_with_serper_error_body():
+    fake_response = MagicMock()
+    fake_response.ok = False
+    fake_response.status_code = 400
+    fake_response.text = '{"message":"Query pattern not allowed for free accounts."}'
+
+    with patch("search.requests.post", return_value=fake_response):
+        try:
+            search_university_courses("Ireland", api_key="fake-key")
+            assert False, "expected RuntimeError"
+        except RuntimeError as error:
+            assert "400" in str(error)
+            assert "not allowed for free accounts" in str(error)
